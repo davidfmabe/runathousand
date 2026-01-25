@@ -34,6 +34,9 @@
       padding: 40px;
       color: #c00;
     }
+    .clickable {
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -45,7 +48,7 @@
     // Google Sheet CSV URL (published sheet)
     const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCUqjKPxn_zHvJKO5IOmO0pyfs6m9CqqkHRWu3jIFoXZEjo53-ukOVC41kr0Ye0sgsRKdbtHdrgRvo/pub?gid=1081820459&single=true&output=csv';
     
-    // Runner colors (matching original SVG)
+    // Runner colors
     const RUNNER_COLORS = {
       'Blair': '#FF6B6B',
       'Clark': '#9D84B7',
@@ -61,6 +64,27 @@
       'Will': '#FFD93D'
     };
 
+    // Easter egg states
+    const easterEggStates = {
+      blairOnFire: false,
+      clarkSkiing: false,
+      jacobSpurs: false,
+      kristynGrad: false,
+      keriFlying: false,
+      johnNYC: false,
+      karlaHokie: false,
+      matthewPi: false,
+      willLegal: false,
+      tylerGuitar: false,
+      daveExplode: false,
+      kristyColorIndex: 0
+    };
+    
+    const kristyColors = ['#FFB6C1', '#FF69B4', '#9370DB', '#00CED1', '#FFD700'];
+
+    // Store runner data globally for re-renders
+    let globalRunners = [];
+
     // Fetch and parse CSV data
     async function fetchSheetData() {
       try {
@@ -69,11 +93,9 @@
         
         const csvText = await response.text();
         const rows = csvText.split('\n').map(row => {
-          // Handle CSV parsing (simple version - assumes no commas in values)
           return row.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''));
         });
         
-        // Find header row to get column indices
         let nameCol = -1;
         let milesCol = -1;
         let headerRowIndex = -1;
@@ -95,7 +117,6 @@
           throw new Error('Could not find "Name" and "Current Total" columns');
         }
         
-        // Parse data rows
         const data = [];
         for (let i = headerRowIndex + 1; i < rows.length; i++) {
           const row = rows[i];
@@ -103,16 +124,13 @@
             const name = row[nameCol].trim();
             const miles = parseFloat(row[milesCol]);
             
-            // Only include known runners with valid miles
             if (name && !isNaN(miles) && RUNNER_COLORS[name]) {
               data.push({ name, miles, color: RUNNER_COLORS[name] });
             }
           }
         }
         
-        // Sort alphabetically by name
         data.sort((a, b) => a.name.localeCompare(b.name));
-        
         return data;
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -120,7 +138,6 @@
       }
     }
 
-    // Calculate pace line position (miles needed to be on track)
     function calculatePaceMiles() {
       const now = new Date();
       const startOfYear = new Date(now.getFullYear(), 0, 1);
@@ -128,57 +145,48 @@
       return Math.round((dayOfYear / 365) * 1000);
     }
 
-    // Generate SVG
     function generateSVG(runners) {
       const paceMiles = calculatePaceMiles();
-      const totalMiles = runners.reduce((sum, r) => sum + r.miles, 0);
       
-      // SVG dimensions and layout
       const width = 1400;
       const height = 800;
-      const leftMargin = 150;
-      const rightMargin = 50;
       const trackStart = 150;
       const trackEnd = 1350;
       const trackWidth = trackEnd - trackStart;
+      const startY = 120;
+      const rowHeight = 55;
       
-      // Calculate Y positions for runners
-      const titleHeight = 70;
-      const bottomPadding = 80;
-      const availableHeight = height - titleHeight - bottomPadding;
-      const rowHeight = availableHeight / runners.length;
-      const startY = titleHeight + 50;
-      
-      // Helper function to convert miles to X position
       const milesToX = (miles) => trackStart + (miles / 1000) * trackWidth;
-      
-      // Build SVG string
-      let svg = `<svg viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100vh; display: block;">
+      const milestoneY1 = startY - 20;
+      const milestoneY2 = startY + ((runners.length - 1) * rowHeight) + 25;
+
+      let svg = `<svg id="mainSvg" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: 100vh; display: block;">
   <defs>
     <filter id="shadow">
       <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
       <feOffset dx="1" dy="2"/>
-      <feComponentTransfer>
-        <feFuncA type="linear" slope="0.4"/>
-      </feComponentTransfer>
-      <feMerge>
-        <feMergeNode/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+      <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#F8F8F8;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#F0F0F0;stop-opacity:1" />
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="50%" stop-color="#F8F8F8"/>
+      <stop offset="100%" stop-color="#F0F0F0"/>
     </linearGradient>
-    
     <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
       <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(0,0,0,0.03)" stroke-width="1"/>
     </pattern>
+    <linearGradient id="fireGradient" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#ff0000"/>
+      <stop offset="50%" stop-color="#ff6600"/>
+      <stop offset="100%" stop-color="#ffcc00"/>
+    </linearGradient>
+    <filter id="fireGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
   
-  <!-- Background -->
   <rect width="${width}" height="${height}" fill="url(#bgGradient)"/>
   <rect width="${width}" height="${height}" fill="url(#grid)"/>
   
@@ -188,73 +196,283 @@
   <path d="M 0 ${height} L 80 ${height} L 80 ${height-3} L 3 ${height-3} L 3 ${height-80} L 0 ${height-80} Z" fill="rgba(0,0,0,0.08)"/>
   <path d="M ${width} ${height} L ${width-80} ${height} L ${width-80} ${height-3} L ${width-3} ${height-3} L ${width-3} ${height-80} L ${width} ${height-80} Z" fill="rgba(0,0,0,0.08)"/>
   
-  <!-- Title -->
-  <text x="${width/2}" y="50" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="42" font-weight="400" fill="#1A1A1A" text-anchor="middle" letter-spacing="3">Progress and Milestones</text>
-  
-  <!-- Scale markers -->
-  <text x="${trackStart}" y="90" font-family="system-ui" font-size="16" font-weight="600" fill="#1A1A1A" text-anchor="middle">0</text>
-  <text x="${trackEnd}" y="90" font-family="system-ui" font-size="16" font-weight="600" fill="#1A1A1A" text-anchor="middle">1000</text>`;
+  <text x="${width/2}" y="50" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="400" fill="#1A1A1A" text-anchor="middle" letter-spacing="3">Progress and Milestones</text>`;
 
-      // Add runner tracks
+      // Runner tracks
       runners.forEach((runner, index) => {
         const y = startY + (index * rowHeight);
         const progressX = milesToX(runner.miles);
+        const isBlair = runner.name === 'Blair';
+        const showFire = isBlair && easterEggStates.blairOnFire;
         
         svg += `
-  
-  <!-- ${runner.name} (${runner.miles}) -->
-  <line x1="${trackStart}" y1="${y}" x2="${trackEnd}" y2="${y}" stroke="#DDD" stroke-width="8" stroke-linecap="round"/>
-  ${runner.miles > 0 ? `<line x1="${trackStart}" y1="${y}" x2="${progressX}" y2="${y}" stroke="${runner.color}" stroke-width="8" stroke-linecap="round"/>` : ''}
-  <text x="50" y="${y + 5}" font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif" font-size="18" font-weight="500" fill="#1A1A1A" text-anchor="start">${runner.name}</text>`;
+  <line x1="${trackStart}" y1="${y}" x2="${trackEnd}" y2="${y}" stroke="#DDD" stroke-width="8" stroke-linecap="round"/>`;
+        
+        if (runner.miles > 0) {
+          svg += `
+  <line x1="${trackStart}" y1="${y}" x2="${progressX}" y2="${y}" stroke="${showFire ? 'url(#fireGradient)' : runner.color}" stroke-width="8" stroke-linecap="round" ${showFire ? 'filter="url(#fireGlow)"' : ''}/>`;
+        }
+        
+        // Fire particles for Blair
+        if (showFire && runner.miles > 0) {
+          for (let i = 0; i < 8; i++) {
+            const flameX = trackStart + ((progressX - trackStart) * (i + 1) / 9);
+            svg += `
+  <ellipse cx="${flameX}" cy="${y - 8}" rx="4" ry="8" fill="#ff6600" opacity="0.8">
+    <animate attributeName="ry" values="8;12;8" dur="${0.3 + i * 0.05}s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.8;0.4;0.8" dur="${0.3 + i * 0.05}s" repeatCount="indefinite"/>
+  </ellipse>
+  <ellipse cx="${flameX}" cy="${y - 12}" rx="2" ry="5" fill="#ffcc00" opacity="0.9">
+    <animate attributeName="ry" values="5;8;5" dur="${0.25 + i * 0.04}s" repeatCount="indefinite"/>
+  </ellipse>
+  <circle cx="${flameX + (i % 2 === 0 ? 2 : -2)}" cy="${y - 20}" r="5" fill="#666" opacity="0">
+    <animate attributeName="cy" values="${y - 20};${y - 50}" dur="${1.5 + i * 0.2}s" repeatCount="indefinite"/>
+    <animate attributeName="r" values="3;8" dur="${1.5 + i * 0.2}s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.4;0" dur="${1.5 + i * 0.2}s" repeatCount="indefinite"/>
+  </circle>`;
+          }
+        }
+        
+        svg += `
+  <text x="50" y="${y + 5}" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="#1A1A1A" text-anchor="start">${runner.name}</text>`;
       });
 
-      // Milestone lines
-      const milestoneY1 = startY - 20;
-      const milestoneY2 = startY + ((runners.length - 1) * rowHeight) + 25;
-      const labelY = milestoneY2 + 30;
-      
       // Pace line
       const paceX = milesToX(paceMiles);
       svg += `
-  
-  <!-- Pace line (${paceMiles} miles) -->
   <line x1="${paceX}" y1="${milestoneY1}" x2="${paceX}" y2="${milestoneY2}" stroke="#00AA00" stroke-width="3" stroke-dasharray="8,8"/>
-  <text x="${paceX}" y="${milestoneY1 - 10}" font-family="system-ui" font-size="16" font-weight="600" fill="#00AA00" text-anchor="middle">Pace</text>
-  <text x="${paceX}" y="${labelY}" font-family="system-ui" font-size="15" fill="#00AA00" text-anchor="middle">${paceMiles}</text>`;
+  <text x="${paceX}" y="${milestoneY1 - 10}" font-family="system-ui" font-size="16" font-weight="600" fill="#00AA00" text-anchor="middle">Pace</text>`;
 
-      // 250 and 500 mile markers
+      // Milestone lines
       [250, 500, 750].forEach(milestone => {
         const x = milesToX(milestone);
         svg += `
-  
-  <!-- ${milestone} mile marker -->
   <line x1="${x}" y1="${milestoneY1}" x2="${x}" y2="${milestoneY2}" stroke="#FF0000" stroke-width="3" stroke-dasharray="8,8"/>
   <text x="${x}" y="${milestoneY1 - 10}" font-family="system-ui" font-size="16" font-weight="600" fill="#FF0000" text-anchor="middle">Milestone</text>
-  <text x="${x}" y="${labelY}" font-family="system-ui" font-size="15" fill="#FF0000" text-anchor="middle">${milestone}</text>`;
+  <text x="${x}" y="${milestoneY2 + 30}" font-family="system-ui" font-size="15" fill="#FF0000" text-anchor="middle">${milestone}</text>`;
       });
 
-      // Animated position markers
+      // Position markers with easter eggs
       runners.forEach((runner, index) => {
         const y = startY + (index * rowHeight);
         const x = milesToX(runner.miles);
+        const name = runner.name;
         
+        // Determine display color for Kristy
+        let displayColor = runner.color;
+        if (name === 'Kristy') {
+          displayColor = kristyColors[easterEggStates.kristyColorIndex];
+        }
+
         svg += `
-  
-  <!-- ${runner.name} marker -->
-  <circle cx="${x}" cy="${y}" r="12" fill="${runner.color}" opacity="0.8">
-    <animate attributeName="r" from="12" to="24" dur="1s" repeatCount="indefinite"/>
-    <animate attributeName="opacity" from="0.8" to="0" dur="1s" repeatCount="indefinite"/>
-  </circle>
-  <circle cx="${x}" cy="${y}" r="10" fill="${runner.color}" filter="url(#shadow)"/>
-  <circle cx="${x}" cy="${y}" r="6" fill="#FFFFFF"/>
-  <text x="${x}" y="${y - 15}" font-family="system-ui" font-size="13" font-weight="600" fill="#1A1A1A" text-anchor="middle">${runner.miles}</text>`;
+  <g class="clickable" data-runner="${name}" style="cursor: pointer;">`;
+
+        // John's Empire State Building
+        if (name === 'John' && easterEggStates.johnNYC) {
+          svg += `
+    <g transform="translate(${x}, ${y})">
+      <rect x="-10" y="-20" width="20" height="28" fill="#8B7355" stroke="#6B5344" stroke-width="0.5"/>
+      <rect x="-8" y="-32" width="16" height="12" fill="#8B7355" stroke="#6B5344" stroke-width="0.5"/>
+      <rect x="-6" y="-42" width="12" height="10" fill="#8B7355" stroke="#6B5344" stroke-width="0.5"/>
+      <rect x="-4" y="-50" width="8" height="8" fill="#8B7355" stroke="#6B5344" stroke-width="0.5"/>
+      <rect x="-2" y="-58" width="4" height="8" fill="#A9A9A9" stroke="#888" stroke-width="0.5"/>
+      <line x1="0" y1="-58" x2="0" y2="-72" stroke="#A9A9A9" stroke-width="2"/>
+      <line x1="0" y1="-72" x2="0" y2="-78" stroke="#A9A9A9" stroke-width="1"/>
+      <rect x="-7" y="-17" width="2" height="3" fill="#FFE4A0" opacity="0.8"/>
+      <rect x="-3" y="-17" width="2" height="3" fill="#FFE4A0" opacity="0.8"/>
+      <rect x="1" y="-17" width="2" height="3" fill="#FFE4A0" opacity="0.8"/>
+      <rect x="5" y="-17" width="2" height="3" fill="#FFE4A0" opacity="0.8"/>
+      <rect x="-7" y="-13" width="2" height="3" fill="#FFE4A0" opacity="0.8"/>
+      <rect x="-3" y="-13" width="2" height="3" fill="#FFE4A0" opacity="0.8"/>
+      <rect x="1" y="-13" width="2" height="3" fill="#FFE4A0" opacity="0.8"/>
+      <rect x="5" y="-13" width="2" height="3" fill="#FFE4A0" opacity="0.8"/>
+    </g>`;
+        }
+        // Karla's Hokie Turkey
+        else if (name === 'Karla' && easterEggStates.karlaHokie) {
+          svg += `
+    <g transform="translate(${x}, ${y})">
+      <ellipse cx="-8" cy="-5" rx="4" ry="12" fill="#630031" transform="rotate(-30, -8, -5)"/>
+      <ellipse cx="-12" cy="0" rx="4" ry="12" fill="#CF4420" transform="rotate(-15, -12, 0)"/>
+      <ellipse cx="-14" cy="6" rx="4" ry="12" fill="#630031"/>
+      <ellipse cx="-12" cy="12" rx="4" ry="12" fill="#CF4420" transform="rotate(15, -12, 12)"/>
+      <ellipse cx="-8" cy="17" rx="4" ry="12" fill="#630031" transform="rotate(30, -8, 17)"/>
+      <ellipse cx="2" cy="6" rx="12" ry="10" fill="#630031"/>
+      <ellipse cx="-2" cy="8" rx="6" ry="5" fill="#CF4420"/>
+      <ellipse cx="12" cy="-2" rx="4" ry="8" fill="#630031"/>
+      <circle cx="14" cy="-12" r="6" fill="#630031"/>
+      <path d="M18,-10 Q22,-8 20,-4" stroke="#FF3333" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <path d="M20,-12 L26,-11 L20,-10 Z" fill="#CF4420"/>
+      <circle cx="16" cy="-13" r="1.5" fill="white"/>
+      <circle cx="16.5" cy="-13" r="0.8" fill="black"/>
+      <line x1="0" y1="14" x2="-2" y2="24" stroke="#CF4420" stroke-width="2"/>
+      <line x1="6" y1="14" x2="8" y2="24" stroke="#CF4420" stroke-width="2"/>
+    </g>`;
+        }
+        // Matthew's Pi
+        else if (name === 'Matthew' && easterEggStates.matthewPi) {
+          svg += `
+    <g transform="translate(${x}, ${y})">
+      <circle cx="0" cy="0" r="16" fill="white" stroke="${runner.color}" stroke-width="2"/>
+      <text x="0" y="10" font-family="serif" font-size="32" font-weight="bold" fill="${runner.color}" text-anchor="middle">π</text>
+    </g>`;
+        }
+        // Tyler's Guitar
+        else if (name === 'Tyler' && easterEggStates.tylerGuitar) {
+          svg += `
+    <g transform="translate(${x}, ${y}) rotate(-45)">
+      <rect x="-2" y="-40" width="4" height="25" fill="#8B4513"/>
+      <rect x="-3" y="-48" width="6" height="8" fill="#4a3728" rx="1"/>
+      <circle cx="-1" cy="-46" r="1" fill="#C0C0C0"/>
+      <circle cx="-1" cy="-43" r="1" fill="#C0C0C0"/>
+      <circle cx="1" cy="-46" r="1" fill="#C0C0C0"/>
+      <circle cx="1" cy="-43" r="1" fill="#C0C0C0"/>
+      <ellipse cx="0" cy="-8" rx="10" ry="8" fill="#DEB887"/>
+      <ellipse cx="0" cy="12" rx="14" ry="12" fill="#DEB887"/>
+      <rect x="-8" y="-8" width="16" height="20" fill="#DEB887"/>
+      <circle cx="0" cy="5" r="5" fill="#4a3728"/>
+      <circle cx="0" cy="5" r="6" fill="none" stroke="#8B4513" stroke-width="1"/>
+      <ellipse cx="0" cy="16" rx="5" ry="1.5" fill="#4a3728"/>
+      <line x1="0" y1="-40" x2="0" y2="16" stroke="#ddd" stroke-width="0.5"/>
+    </g>`;
+        }
+        // Jacob's Spurs Cockerel
+        else if (name === 'Jacob' && easterEggStates.jacobSpurs) {
+          svg += `
+    <g transform="translate(${x - 12}, ${y - 16})">
+      <ellipse cx="12" cy="18" rx="8" ry="10" fill="white" stroke="#132257" stroke-width="1.5"/>
+      <path d="M4,18 Q-4,10 2,4 Q6,8 8,14" fill="white" stroke="#132257" stroke-width="1.5"/>
+      <path d="M5,20 Q-2,14 4,6 Q8,10 9,16" fill="white" stroke="#132257" stroke-width="1.5"/>
+      <ellipse cx="16" cy="10" rx="4" ry="6" fill="white" stroke="#132257" stroke-width="1.5"/>
+      <circle cx="18" cy="4" r="4" fill="white" stroke="#132257" stroke-width="1.5"/>
+      <path d="M16,0 L17,-4 L18,-1 L19,-3 L20,0" fill="white" stroke="#132257" stroke-width="1.5"/>
+      <path d="M22,4 L26,5 L22,6 Z" fill="white" stroke="#132257" stroke-width="1"/>
+      <circle cx="19" cy="3" r="1" fill="#132257"/>
+      <line x1="10" y1="26" x2="8" y2="34" stroke="#132257" stroke-width="2"/>
+      <line x1="14" y1="26" x2="16" y2="34" stroke="#132257" stroke-width="2"/>
+      <circle cx="12" cy="34" r="5" fill="white" stroke="#132257" stroke-width="1.5"/>
+    </g>`;
+        }
+        // Kristyn's Mortar Board
+        else if (name === 'Kristyn' && easterEggStates.kristynGrad) {
+          svg += `
+    <g transform="translate(${x}, ${y})">
+      <ellipse cx="0" cy="2" rx="10" ry="6" fill="#1a1a1a"/>
+      <polygon points="-14,-6 14,-6 10,-10 -10,-10" fill="#1a1a1a"/>
+      <polygon points="-14,-6 14,-6 14,-8 -14,-8" fill="#333"/>
+      <circle cx="0" cy="-9" r="2" fill="#1a1a1a" stroke="#333" stroke-width="0.5"/>
+      <path d="M0,-9 Q8,-6 6,8" stroke="#F4A261" stroke-width="2" fill="none"/>
+      <rect x="4" y="6" width="4" height="8" fill="#F4A261" rx="1"/>
+      <line x1="5" y1="14" x2="4" y2="20" stroke="#F4A261" stroke-width="1"/>
+      <line x1="6" y1="14" x2="6" y2="21" stroke="#F4A261" stroke-width="1"/>
+      <line x1="7" y1="14" x2="8" y2="20" stroke="#F4A261" stroke-width="1"/>
+    </g>`;
+        }
+        // Keri's Airplane (animated)
+        else if (name === 'Keri' && easterEggStates.keriFlying) {
+          svg += `
+    <g id="keriPlane">
+      <style>
+        @keyframes flyPlane { 
+          0% { transform: translate(${x}px, ${y}px); } 
+          100% { transform: translate(${trackEnd + 30}px, ${y}px); } 
+        }
+        #keriPlane g { animation: flyPlane 3s ease-in-out forwards; }
+      </style>
+      <g>
+        <ellipse cx="0" cy="0" rx="16" ry="5" fill="${runner.color}"/>
+        <path d="M16,0 L24,-1 L24,1 Z" fill="${runner.color}"/>
+        <path d="M-16,0 L-22,-8 L-14,-8 L-12,0" fill="${runner.color}"/>
+        <path d="M-16,0 L-22,8 L-14,8 L-12,0" fill="${runner.color}"/>
+        <path d="M-2,-4 L6,-4 L8,-14 L0,-14 Z" fill="${runner.color}" stroke="#fff" stroke-width="0.5"/>
+        <path d="M-2,4 L6,4 L8,14 L0,14 Z" fill="${runner.color}" stroke="#fff" stroke-width="0.5"/>
+        <circle cx="8" cy="0" r="2" fill="#fff" opacity="0.8"/>
+        <circle cx="2" cy="0" r="2" fill="#fff" opacity="0.8"/>
+        <circle cx="-4" cy="0" r="2" fill="#fff" opacity="0.8"/>
+      </g>
+    </g>`;
+        }
+        // Dave's Explosion (animated)
+        else if (name === 'Dave' && easterEggStates.daveExplode) {
+          svg += `
+    <g id="daveExplosion">
+      <style>
+        @keyframes explodeFlash { 0% { r: 10; opacity: 1; } 50% { r: 60; opacity: 0.8; } 100% { r: 80; opacity: 0; } }
+        @keyframes explodeOrange { 0% { r: 5; opacity: 1; } 50% { r: 45; opacity: 0.7; } 100% { r: 60; opacity: 0; } }
+        @keyframes explodeRed { 0% { r: 5; opacity: 1; } 50% { r: 30; opacity: 0.8; } 100% { r: 40; opacity: 0; } }
+        @keyframes debris0 { 0% { transform: translate(${x}px, ${y}px); opacity: 1; } 100% { transform: translate(${x + 60}px, ${y}px); opacity: 0; } }
+        @keyframes debris1 { 0% { transform: translate(${x}px, ${y}px); opacity: 1; } 100% { transform: translate(${x + 42}px, ${y - 42}px); opacity: 0; } }
+        @keyframes debris2 { 0% { transform: translate(${x}px, ${y}px); opacity: 1; } 100% { transform: translate(${x}px, ${y - 60}px); opacity: 0; } }
+        @keyframes debris3 { 0% { transform: translate(${x}px, ${y}px); opacity: 1; } 100% { transform: translate(${x - 42}px, ${y - 42}px); opacity: 0; } }
+        @keyframes debris4 { 0% { transform: translate(${x}px, ${y}px); opacity: 1; } 100% { transform: translate(${x - 60}px, ${y}px); opacity: 0; } }
+        @keyframes debris5 { 0% { transform: translate(${x}px, ${y}px); opacity: 1; } 100% { transform: translate(${x - 42}px, ${y + 42}px); opacity: 0; } }
+        @keyframes debris6 { 0% { transform: translate(${x}px, ${y}px); opacity: 1; } 100% { transform: translate(${x}px, ${y + 60}px); opacity: 0; } }
+        @keyframes debris7 { 0% { transform: translate(${x}px, ${y}px); opacity: 1; } 100% { transform: translate(${x + 42}px, ${y + 42}px); opacity: 0; } }
+      </style>
+      <circle cx="${x}" cy="${y}" r="10" fill="#fff" style="animation: explodeFlash 0.4s ease-out forwards;"/>
+      <circle cx="${x}" cy="${y}" r="5" fill="#FF6600" style="animation: explodeOrange 0.5s ease-out forwards;"/>
+      <circle cx="${x}" cy="${y}" r="5" fill="#FF0000" style="animation: explodeRed 0.45s ease-out forwards;"/>
+      <circle cx="0" cy="0" r="5" fill="${runner.color}" style="animation: debris0 0.6s ease-out forwards;"/>
+      <circle cx="0" cy="0" r="4" fill="#FF6600" style="animation: debris1 0.6s ease-out forwards;"/>
+      <circle cx="0" cy="0" r="5" fill="${runner.color}" style="animation: debris2 0.6s ease-out forwards;"/>
+      <circle cx="0" cy="0" r="4" fill="#FF6600" style="animation: debris3 0.6s ease-out forwards;"/>
+      <circle cx="0" cy="0" r="5" fill="${runner.color}" style="animation: debris4 0.6s ease-out forwards;"/>
+      <circle cx="0" cy="0" r="4" fill="#FF6600" style="animation: debris5 0.6s ease-out forwards;"/>
+      <circle cx="0" cy="0" r="5" fill="${runner.color}" style="animation: debris6 0.6s ease-out forwards;"/>
+      <circle cx="0" cy="0" r="4" fill="#FF6600" style="animation: debris7 0.6s ease-out forwards;"/>
+    </g>`;
+        }
+        // Default pulsing dot
+        else {
+          svg += `
+    <circle cx="${x}" cy="${y}" r="12" fill="${displayColor}" opacity="0.8">
+      <animate attributeName="r" from="12" to="24" dur="1s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" from="0.8" to="0" dur="1s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="${x}" cy="${y}" r="10" fill="${displayColor}" filter="url(#shadow)"/>
+    <circle cx="${x}" cy="${y}" r="6" fill="#FFFFFF"/>`;
+        }
+
+        svg += `
+  </g>`;
       });
 
-      // Group total
-      svg += `
-  
-  <!-- Group Total -->
-  <text x="${width/2}" y="${height - 20}" font-family="system-ui" font-size="18" fill="#666" text-anchor="middle">Group Total: ${totalMiles.toLocaleString()} miles (${(totalMiles / (runners.length * 1000) * 100).toFixed(1)}% of combined goal)</text>`;
+      // Clark's Snowfall
+      if (easterEggStates.clarkSkiing) {
+        svg += `
+  <g id="snowfall">
+    <style>
+      @keyframes snowfall {
+        0% { transform: translateY(-20px); opacity: 0; }
+        10% { opacity: 0.9; }
+        90% { opacity: 0.9; }
+        100% { transform: translateY(820px); opacity: 0; }
+      }
+    </style>`;
+        for (let i = 0; i < 60; i++) {
+          const xPos = 100 + ((i * 137) % 1200);
+          const size = 3 + (i % 4);
+          const duration = 2 + (i % 3);
+          const delay = (i % 10) * 0.15;
+          svg += `
+    <circle cx="${xPos}" cy="0" r="${size}" fill="#ffffff" stroke="#a8d4f0" stroke-width="0.5" style="animation: snowfall ${duration}s ease-in ${delay}s forwards;"/>`;
+        }
+        svg += `
+  </g>`;
+      }
+
+      // Will's NUNC PRO TUNC
+      if (easterEggStates.willLegal) {
+        svg += `
+  <g id="willOverlay">
+    <style>
+      @keyframes strobe { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+      @keyframes fadeOut { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+    </style>
+    <rect x="0" y="0" width="${width}" height="${height}" fill="black" style="animation: fadeOut 2s forwards;"/>
+    <text x="${width/2}" y="${height/2}" font-family="serif" font-size="72" font-weight="bold" font-style="italic" fill="#FFD700" text-anchor="middle" style="animation: strobe 0.2s infinite, fadeOut 2s forwards;">NUNC PRO TUNC!</text>
+  </g>`;
+      }
 
       svg += `
 </svg>`;
@@ -262,29 +480,98 @@
       return svg;
     }
 
-    // Main initialization
+    function handleRunnerClick(runnerName) {
+      switch(runnerName) {
+        case 'Blair':
+          easterEggStates.blairOnFire = !easterEggStates.blairOnFire;
+          break;
+        case 'Clark':
+          if (!easterEggStates.clarkSkiing) {
+            easterEggStates.clarkSkiing = true;
+            setTimeout(() => { easterEggStates.clarkSkiing = false; render(); }, 3000);
+          }
+          break;
+        case 'Jacob':
+          easterEggStates.jacobSpurs = !easterEggStates.jacobSpurs;
+          break;
+        case 'Kristyn':
+          easterEggStates.kristynGrad = !easterEggStates.kristynGrad;
+          break;
+        case 'Keri':
+          if (!easterEggStates.keriFlying) {
+            easterEggStates.keriFlying = true;
+            setTimeout(() => { easterEggStates.keriFlying = false; render(); }, 3000);
+          }
+          break;
+        case 'John':
+          easterEggStates.johnNYC = !easterEggStates.johnNYC;
+          break;
+        case 'Karla':
+          easterEggStates.karlaHokie = !easterEggStates.karlaHokie;
+          break;
+        case 'Matthew':
+          easterEggStates.matthewPi = !easterEggStates.matthewPi;
+          break;
+        case 'Will':
+          if (!easterEggStates.willLegal) {
+            easterEggStates.willLegal = true;
+            setTimeout(() => { easterEggStates.willLegal = false; render(); }, 2000);
+          }
+          break;
+        case 'Tyler':
+          easterEggStates.tylerGuitar = !easterEggStates.tylerGuitar;
+          break;
+        case 'Dave':
+          if (!easterEggStates.daveExplode) {
+            easterEggStates.daveExplode = true;
+            setTimeout(() => { easterEggStates.daveExplode = false; render(); }, 1500);
+          }
+          break;
+        case 'Kristy':
+          easterEggStates.kristyColorIndex = (easterEggStates.kristyColorIndex + 1) % kristyColors.length;
+          break;
+      }
+      render();
+    }
+
+    function render() {
+      if (globalRunners.length === 0) return;
+      const container = document.getElementById('visualization');
+      container.innerHTML = generateSVG(globalRunners);
+      
+      // Add click handlers
+      document.querySelectorAll('.clickable').forEach(el => {
+        el.addEventListener('click', () => {
+          const runner = el.getAttribute('data-runner');
+          handleRunnerClick(runner);
+        });
+      });
+    }
+
     async function init() {
       const container = document.getElementById('visualization');
       
       try {
-        const runners = await fetchSheetData();
+        globalRunners = await fetchSheetData();
         
-        if (runners.length === 0) {
+        if (globalRunners.length === 0) {
           container.innerHTML = '<div id="error">No runner data found. Please check the Google Sheet format.</div>';
           return;
         }
         
-        container.innerHTML = generateSVG(runners);
+        render();
       } catch (error) {
         container.innerHTML = `<div id="error">Error loading data: ${error.message}<br><br>Please check that the Google Sheet is published and accessible.</div>`;
       }
     }
 
-    // Run on page load
     init();
-    
-    // Refresh every 5 minutes
-    setInterval(init, 5 * 60 * 1000);
+    setInterval(async () => {
+      try {
+        globalRunners = await fetchSheetData();
+        render();
+      } catch (e) { console.error(e); }
+    }, 5 * 60 * 1000);
   </script>
 </body>
 </html>
