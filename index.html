@@ -265,7 +265,8 @@
         }
 
         svg += `
-  <g class="clickable" data-runner="${name}" style="cursor: pointer;">`;
+  <g class="clickable" data-runner="${name}" style="cursor: pointer;">
+    <title>${name}: ${runner.miles} miles</title>`;
 
         // John's Empire State Building
         if (name === 'John' && easterEggStates.johnNYC) {
