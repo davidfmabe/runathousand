@@ -45,7 +45,7 @@
   </div>
 
   <script>
-    // Run a Thousand Progress Tracker - v2.1 with hover tooltips
+    // Run a Thousand Progress Tracker - v2.2 with hover tooltips, date display, subtle pace line
     // Google Sheet CSV URL (published sheet)
     const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCUqjKPxn_zHvJKO5IOmO0pyfs6m9CqqkHRWu3jIFoXZEjo53-ukOVC41kr0Ye0sgsRKdbtHdrgRvo/pub?gid=1081820459&single=true&output=csv';
     
@@ -85,6 +85,27 @@
 
     // Store runner data globally for re-renders
     let globalRunners = [];
+    let throughDate = '';
+
+    // Fetch the "through date" from cell D8 (same sheet as runner data)
+    async function fetchThroughDate() {
+      try {
+        const response = await fetch(SHEET_CSV_URL);
+        if (!response.ok) return '';
+        
+        const csvText = await response.text();
+        const rows = csvText.split('\n').map(row => row.split(',').map(cell => cell.trim().replace(/^"|"$/g, '')));
+        
+        // D8 = row 8 (index 7), column D (index 3)
+        if (rows.length > 7 && rows[7].length > 3) {
+          return rows[7][3];
+        }
+        return '';
+      } catch (error) {
+        console.error('Error fetching through date:', error);
+        return '';
+      }
+    }
 
     // Fetch and parse CSV data
     async function fetchSheetData() {
@@ -197,7 +218,8 @@
   <path d="M 0 ${height} L 80 ${height} L 80 ${height-3} L 3 ${height-3} L 3 ${height-80} L 0 ${height-80} Z" fill="rgba(0,0,0,0.08)"/>
   <path d="M ${width} ${height} L ${width-80} ${height} L ${width-80} ${height-3} L ${width-3} ${height-3} L ${width-3} ${height-80} L ${width} ${height-80} Z" fill="rgba(0,0,0,0.08)"/>
   
-  <text x="${width/2}" y="50" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="400" fill="#1A1A1A" text-anchor="middle" letter-spacing="3">Progress and Milestones</text>`;
+  <text x="${width/2}" y="40" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="400" fill="#1A1A1A" text-anchor="middle" letter-spacing="3">Progress and Milestones</text>
+  <text x="${width/2}" y="62" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="400" fill="#666" text-anchor="middle">through ${throughDate}</text>`;
 
       // Runner tracks
       runners.forEach((runner, index) => {
@@ -238,11 +260,11 @@
   <text x="50" y="${y + 5}" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="#1A1A1A" text-anchor="start">${runner.name}</text>`;
       });
 
-      // Pace line
+      // Pace line - subtle
       const paceX = milesToX(paceMiles);
       svg += `
-  <line x1="${paceX}" y1="${milestoneY1}" x2="${paceX}" y2="${milestoneY2}" stroke="#00AA00" stroke-width="3" stroke-dasharray="8,8"/>
-  <text x="${paceX}" y="${milestoneY1 - 10}" font-family="system-ui" font-size="16" font-weight="600" fill="#00AA00" text-anchor="middle">Pace</text>`;
+  <line x1="${paceX}" y1="${milestoneY1}" x2="${paceX}" y2="${milestoneY2}" stroke="#00AA00" stroke-width="2" stroke-dasharray="8,8" opacity="0.5"/>
+  <text x="${paceX}" y="${milestoneY1 - 10}" font-family="system-ui" font-size="14" font-weight="500" fill="#00AA00" text-anchor="middle" opacity="0.6">Pace</text>`;
 
       // Milestone lines
       [250, 500, 750].forEach(milestone => {
@@ -554,7 +576,9 @@
       const container = document.getElementById('visualization');
       
       try {
+        // Fetch both runner data and through date
         globalRunners = await fetchSheetData();
+        throughDate = await fetchThroughDate();
         
         if (globalRunners.length === 0) {
           container.innerHTML = '<div id="error">No runner data found. Please check the Google Sheet format.</div>';
@@ -571,6 +595,7 @@
     setInterval(async () => {
       try {
         globalRunners = await fetchSheetData();
+        throughDate = await fetchThroughDate();
         render();
       } catch (e) { console.error(e); }
     }, 5 * 60 * 1000);
