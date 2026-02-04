@@ -45,7 +45,7 @@
   </div>
 
   <script>
-    // Run a Thousand Progress Tracker - v2.2 with hover tooltips, date display, subtle pace line
+    // Run a Thousand Progress Tracker - v2.3 with hover tooltips, date display, subtle pace line, 800 milestone
     // Google Sheet CSV URL (published sheet)
     const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCUqjKPxn_zHvJKO5IOmO0pyfs6m9CqqkHRWu3jIFoXZEjo53-ukOVC41kr0Ye0sgsRKdbtHdrgRvo/pub?gid=1081820459&single=true&output=csv';
     
@@ -267,12 +267,12 @@
   <text x="${paceX}" y="${milestoneY1 - 10}" font-family="system-ui" font-size="14" font-weight="500" fill="#00AA00" text-anchor="middle" opacity="0.6">Pace</text>`;
 
       // Milestone lines
-      [250, 500, 750].forEach(milestone => {
+      [250, 500, 750, 800].forEach(milestone => {
         const x = milesToX(milestone);
         svg += `
-  <line x1="${x}" y1="${milestoneY1}" x2="${x}" y2="${milestoneY2}" stroke="#FF0000" stroke-width="3" stroke-dasharray="8,8"/>
-  <text x="${x}" y="${milestoneY1 - 10}" font-family="system-ui" font-size="16" font-weight="600" fill="#FF0000" text-anchor="middle">Milestone</text>
-  <text x="${x}" y="${milestoneY2 + 30}" font-family="system-ui" font-size="15" fill="#FF0000" text-anchor="middle">${milestone}</text>`;
+  <line x1="${x}" y1="${milestoneY1}" x2="${x}" y2="${milestoneY2}" stroke="#FF0000" stroke-width="2" stroke-dasharray="6,6"/>
+  <text x="${x}" y="${milestoneY1 - 8}" font-family="system-ui" font-size="12" font-weight="500" fill="#FF0000" text-anchor="middle">Milestone</text>
+  <text x="${x}" y="${milestoneY2 + 22}" font-family="system-ui" font-size="12" fill="#FF0000" text-anchor="middle">${milestone}</text>`;
       });
 
       // Position markers with easter eggs
